@@ -1,0 +1,6 @@
+weaviate
+weaviate-client
+autogen-core
+autogen-ext
+autogen-agentchat
+dotenv

@@ -1,0 +1,39 @@
+# --- Environment Variables ---
+# Never, ever commit your API keys or secrets!
+.env
+.env.*
+
+# --- Python ---
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+*/venv/
+*/.venv/
+
+# Cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build and distribution artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# --- IDE / Editor specific files ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- TensorFlow/HuggingFace Cache ---
+# Can be large and should be downloaded by the server on demand
+.cache/
+*/.cache/
+
+# --- Other ---
+# Log files
+*.log
