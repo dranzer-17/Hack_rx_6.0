@@ -10,7 +10,7 @@ class Response_format(BaseModel):
     decision: str = Field(description = 'Accepted or Rejected')
     amount: int = Field(description = "Amount to be claimed")
     justification: str = Field(description = "The justification regarding the desicion")
-    clauses_referenced: List = Field(description = "The clauses related to the acceptance or denial of the claim")
+    clauses_referenced: List = Field(description = "The clauses related to the acceptance or denial of the claim") 
 
 def get_model_client():
     """

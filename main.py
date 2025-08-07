@@ -1,93 +1,90 @@
+import asyncio
+import os
+import uuid
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl, Field
 from typing import List
-import json
-import re
 
-# Your custom application imports
+# Import our custom modules from their correct locations
+from config.document_processor import process_document_from_url
 from config.vector_store import get_vector_store
 from teams.Round_Robin_Team import get_team
+from config.prompt import qa_validator_system_message
+from config.tools import reteriever_tool # The simple, unfiltered tool
 
-# --- Initialization of your application components ---
-# This part remains the same. It sets up your Weaviate client and agent team.
-vector_store, client = get_vector_store()
-team_1 = get_team()
-
-
-# --- Pydantic Models for Request and Response ---
-# These models define the expected structure for the API call, matching the problem description.
-class HackRxInput(BaseModel):
-    documents: str
-    questions: List[str]
-
-class HackRxOutput(BaseModel):
-    answers: List[str]
-
-
-# --- FastAPI Application Instance ---
-app = FastAPI()
-
-
-# --- API Endpoint Definition ---
-@app.post("/hackrx/run", response_model=HackRxOutput)
-async def run_hackrx_task(payload: HackRxInput):
+# --- Pydantic Models for the API Request and Response ---
+class HackRxRequest(BaseModel):
     """
-    Accepts a list of questions, runs the agent team for each one,
-    extracts the answer from the agent's final JSON output,
-    and returns a single JSON response with all answers.
+    Defines the structure for the incoming POST request.
     """
-    all_answers = []
+    documents: HttpUrl = Field(..., description="URL to the policy document to be processed.")
+    questions: List[str] = Field(..., description="A list of questions to ask about the document.")
 
+class HackRxResponse(BaseModel):
+    """
+    Defines the structure for the JSON response.
+    """
+    answers: List[str] = Field(..., description="A list of answers corresponding to the questions asked.")
+
+# --- FastAPI App Initialization ---
+app = FastAPI(
+    title="HackRx Insurance Policy Q&A",
+    description="API to answer questions about an insurance policy document."
+)
+
+@app.on_event("startup")
+def startup_event():
+    """Initializes the vector store and client when the app starts."""
+    global vector_store, client
+    vector_store, client = get_vector_store()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    """Closes the client connection when the app shuts down."""
+    client.close()
+
+@app.post("/hackrx/run", response_model=HackRxResponse)
+async def run_hackrx_flow(request: HackRxRequest):
+    """
+    This endpoint ingests a document and runs the agentic workflow for each question.
+    WARNING: This version adds all documents to the same shared database.
+    """
+    print(f"Processing document from URL: {request.documents}")
+
+    # 1. Process document from the URL
     try:
-        # Loop over each question provided in the request payload
-        for question in payload.questions:
-            # Run the agent team. This is a synchronous call that waits for the
-            # entire multi-agent conversation to complete for the current question.
-            final_state = team_1.run(task=question)
-            
-            last_message_content = None
-            # The agent's final response is in the chat history. We search backwards
-            # to find the last message from the 'ValidatorAgent'.
-            if final_state and final_state.chat_history:
-                for msg in reversed(final_state.chat_history):
-                    if msg.get("name") == "ValidatorAgent" and "justification" in msg.get("content", ""):
-                        last_message_content = msg.get("content")
-                        break
-
-            if last_message_content:
-                try:
-                    # Agents often wrap JSON in text or markdown. A regular expression
-                    # is the most reliable way to extract the JSON block.
-                    json_match = re.search(r'\{.*\}', last_message_content, re.DOTALL)
-                    
-                    if json_match:
-                        json_string = json_match.group(0)
-                        agent_output = json.loads(json_string)
-                        # Your ValidatorAgent is prompted to put the answer in the
-                        # 'justification' field. We extract it from the parsed JSON.
-                        answer = agent_output.get("justification", "No justification found.")
-                        all_answers.append(answer)
-                    else:
-                        all_answers.append("Could not extract valid JSON from the agent's response.")
-
-                except json.JSONDecodeError:
-                    # This handles cases where the extracted string is not valid JSON.
-                    all_answers.append("Failed to decode the JSON from the agent's response.")
-            else:
-                # This is a fallback if the ValidatorAgent failed to produce a message.
-                all_answers.append("The agent team did not provide a final structured answer for this question.")
-
-            # IMPORTANT: Reset the team's state to ensure the context of the previous
-            # question does not leak into the next one.
-            team_1.reset()
-
-        # After the loop, return the final Pydantic model, which FastAPI will serialize into JSON.
-        return HackRxOutput(answers=all_answers)
-
+        chunks = await process_document_from_url(str(request.documents))
+        if not chunks:
+            raise HTTPException(status_code=400, detail="Could not extract any content from the document.")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        # It is good practice to close long-lived connections.
-        client.close()
-        print("Task finished. Client connection has been closed.")
+        raise HTTPException(status_code=500, detail=f"Failed to process document: {e}")
+
+    # 2. Ingest document chunks into Weaviate
+    # All chunks from all requests are added to the same database.
+    vector_store.add_documents(chunks)
+    print(f"Ingested {len(chunks)} chunks into the shared database.")
+
+    # 3. Loop through questions and run the agent team
+    final_answers = []
+    
+    for question in request.questions:
+        print(f"--- Running team for question: '{question}' ---")
+        try:
+            # This creates the standard team, which will use the simple, unfiltered tool.
+            # The tool will search across ALL documents ever ingested.
+            team_1 = get_team() 
+
+            chat_result = await team_1.run(task=question)
+
+            if chat_result and chat_result.chat_history:
+                # The final message should be the answer from the Validator agent.
+                answer = chat_result.chat_history[-1]['content'].replace("STOP", "").strip()
+                final_answers.append(answer)
+            else:
+                final_answers.append("The agent team failed to produce a valid answer.")
+
+        except Exception as e:
+            print(f"An error occurred while running the agent team for a question: {e}")
+            final_answers.append("An error occurred while processing this question.")
+            
+    return HackRxResponse(answers=final_answers)
