@@ -75,12 +75,14 @@ async def run_hackrx_flow(request: HackRxRequest):
             team_1 = get_team() 
 
             chat_result = await team_1.run(task=question)
-            print(chat_result.messages[-1].content)
-            # final_answers.append(str(chat_result))
+            final_answers.append(chat_result.messages[-1].content['answers'])
             # print(final_answers)
 
         except Exception as e:
             print(f"An error occurred while running the agent team for a question: {e}")
             final_answers.append("An error occurred while processing this question.")
+            
+        finally:
+            print(final_answers)
             
     return HackRxResponse(answers=final_answers)
