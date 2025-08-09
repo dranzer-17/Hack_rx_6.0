@@ -1,8 +1,7 @@
 from .vector_store import get_vector_store
 from typing import List
-from langchain.docstore.document import Document
 
-def reteriever_tool(query: str):
+def reteriever_tool(query:str ):
     """
     Reterieves relevant documents from the vector store based on a query.
     """
@@ -14,8 +13,8 @@ def reteriever_tool(query: str):
         search_kwargs={'k': 50, 'fetch_k': 500}
     )
     
-    related_docs: List[Document] = reteriever.invoke(query)
+    related_docs = reteriever.invoke(query)
     
     # --- THIS IS THE FIX ---
     # Convert the list of complex Document objects into a simple list of strings.
-    return [doc.page_content for doc in related_docs]
+    return related_docs

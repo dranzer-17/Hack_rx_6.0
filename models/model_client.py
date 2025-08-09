@@ -6,11 +6,11 @@ from pydantic import BaseModel,Field
 from typing import List
 load_dotenv()
 
-class Response_format(BaseModel):
-    decision: str = Field(description = 'Accepted or Rejected')
-    amount: int = Field(description = "Amount to be claimed")
-    justification: str = Field(description = "The justification regarding the desicion")
-    clauses_referenced: List = Field(description = "The clauses related to the acceptance or denial of the claim") 
+class HackRxResponse(BaseModel):
+    """
+    Defines the structure for the JSON response.
+    """
+    answers: List[str] = Field(..., description="A list of answers corresponding to the questions asked.")
 
 def get_model_client():
     """
@@ -30,7 +30,7 @@ def get_model_client():
     model_client_1 = OpenAIChatCompletionClient(
         model = 'gemini-2.5-flash',
         api_key = os.getenv("GEMINI_API_KEY"),
-        response_format = Response_format
+        response_format = HackRxResponse
     )
 
     model_client_2 = OpenAIChatCompletionClient(

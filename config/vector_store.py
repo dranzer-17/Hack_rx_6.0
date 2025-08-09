@@ -2,12 +2,12 @@ import os
 import weaviate
 from langchain_weaviate import WeaviateVectorStore
 from dotenv import load_dotenv
-
+from langchain_huggingface import HuggingFaceEmbeddings
 # Import our new client class
-from .embedding_client import HuggingFaceInferenceAPIEmbeddings
 
 load_dotenv()
 
+embeddings= HuggingFaceEmbeddings(model= 'BAAI/bge-small-en-v1.5')
 # Load credentials from .env file
 weaviate_url = os.getenv("WEAVIATE_URL")
 weaviate_api_key = os.getenv("WEAVIATE_API_KEY")
@@ -19,7 +19,7 @@ def get_vector_store():
         raise ValueError("HUGGINGFACE_API_TOKEN is not set in the environment variables.")
 
     # Create an instance of our new embedding client
-    embeddings = HuggingFaceInferenceAPIEmbeddings(api_token=hf_api_token)
+    
 
     client = weaviate.connect_to_weaviate_cloud(
         cluster_url=weaviate_url,

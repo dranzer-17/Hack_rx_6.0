@@ -75,13 +75,9 @@ async def run_hackrx_flow(request: HackRxRequest):
             team_1 = get_team() 
 
             chat_result = await team_1.run(task=question)
-
-            if chat_result and chat_result.chat_history:
-                # The final message should be the answer from the Validator agent.
-                answer = chat_result.chat_history[-1]['content'].replace("STOP", "").strip()
-                final_answers.append(answer)
-            else:
-                final_answers.append("The agent team failed to produce a valid answer.")
+            print(chat_result.messages[-1].content)
+            # final_answers.append(str(chat_result))
+            # print(final_answers)
 
         except Exception as e:
             print(f"An error occurred while running the agent team for a question: {e}")

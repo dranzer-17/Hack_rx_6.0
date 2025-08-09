@@ -25,7 +25,7 @@ def get_team():
                             description = "This agent is used to enhance the user query than reterieve documents and also to validate the documents",
                             participants = [query_enhancer_agent,reterival_agent,Validator_agent],
                             termination_condition = termination_condition,
-                            max_turns= 6
+                            max_turns= 3
                             )
     
     return team_1
